@@ -1,8 +1,11 @@
 import telebot
 from telebot import types
 import random
+from database import Database
 
 bot = telebot.TeleBot("7552632953:AAHkhCDydlXxytzBM96FgZ5M4gAU15pn5D4")
+bot_name="aero33_bot"
+db = Database()
 
 user_data = {}
 
@@ -20,7 +23,8 @@ def require_captcha(func):
             num1, num2, answer = generate_capcha()
             user_data[user_id] = {
                 'capcha_answer': answer,
-                'capcha_solved': False
+                'capcha_solved': False,
+                'user_id':str(message.text[7:])
             }
             bot.send_message(user_id, f'Для продолжения работы пройдите проверку: {num1} + {num2} = ?')
             return  # Прекращаем выполнение, не вызывая оригинальную функцию
@@ -51,7 +55,7 @@ def callback_handler(call):
     elif call.data == "balance":
         ...
     elif call.data == "ref":
-        bot.send_message(call.message.chat.id,"Ваша реферальная ссылка - jopajopajopa")
+        bot.send_message(call.message.chat.id, f" Ваша реферальная ссылка : \nhttps://t.me/{bot_name}?start={call.from_user.id}\nКол-во рефералов - {db.count_referers(call.from_user.id)}")
     elif call.data == "tasks":
         bot.delete_message(call.message.chat.id, call.message.message_id)
         markup = types.InlineKeyboardMarkup()
@@ -81,10 +85,28 @@ def callback_handler(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         menu(call.message)
 
+
+
 @bot.message_handler(commands=['start'])
 @require_captcha
 def start(message):
     print(message.from_user.first_name)
+    print(message.text)
+    # user_id = message.chat.id
+    # referer_id=user_data[user_id]['user_id']
+    # if not db.user_exists(message.from_user.id):
+    #     print(user_data[user_id]['user_id'])
+    #     if referer_id != '':
+    #         if str(referer_id) != str(message.from_user.id):
+    #             db.add_user(message.from_user.id, referer_id)
+    #             try:
+    #                 bot.send_message(referer_id, "По вашей ссылке зарегистрировался новый пользователь")
+    #             except:
+    #                 pass
+    #         else:
+    #             bot.send_message(message.from_user.id,"Регистрироваться по своей реферальной ссылке нельзя")
+    #     else:
+    #         db.add_user(message.from_user.id)
     menu(message)
 
 @bot.message_handler(commands=['menu'])
@@ -101,8 +123,27 @@ def handle_messages(message):
             correct_answer = user_data[user_id]['capcha_answer']
             if user_answer == correct_answer:
                 user_data[user_id]['capcha_solved'] = True
+
                 bot.send_message(user_id, "Капча пройдена! Добро пожаловать в меню.")
-                menu(message)  # Показываем меню после прохождения капчи
+                user_id = message.chat.id
+                referer_id = user_data[user_id]['user_id']
+                if not db.user_exists(message.from_user.id):
+                    print(user_data[user_id]['user_id'])
+                    if referer_id != '':
+                        if str(referer_id) != str(message.from_user.id):
+                            db.add_user(message.from_user.id, referer_id)
+                            try:
+                                bot.send_message(referer_id, f"По вашей ссылке зарегистрировался новый пользователь {message.from_user.first_name}")
+                            except:
+                                pass
+                        else:
+                            bot.send_message(message.from_user.id,
+                                             "Регистрироваться по своей реферальной ссылке нельзя")
+                    else:
+                        db.add_user(message.from_user.id)
+                start(message)
+
+
             else:
                 bot.send_message(user_id, "Неправильный ответ. Попробуйте снова.")
                 num1, num2, answer = generate_capcha()
